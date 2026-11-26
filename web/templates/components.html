@@ -1,0 +1,97 @@
+{% macro heading(title, description) %}
+<header class="page-heading">
+    <h1>{{ title }}</h1>
+    {% if description %}<p>{{ description }}</p>{% endif %}
+</header>
+{% endmacro %}
+
+{% macro branches(nodes, selected='', all_label='Todas las sucursales') %}
+<label class="form-label" for="sucursal">Sucursal{% if not all_label %} para la consulta local{% endif %}</label>
+<select class="form-select" id="sucursal" name="sucursal">
+    {% if all_label %}<option value="">{{ all_label }}</option>{% endif %}
+    {% for node in nodes %}
+    <option value="{{ node.key }}"{% if selected == node.key %} selected{% endif %}>{{ node.name }}</option>
+    {% endfor %}
+</select>
+{% endmacro %}
+
+{% macro issues(batch, message='Alcance parcial. Solo se muestran datos de los nodos consultados.') %}
+{% if batch.errors %}
+<div class="notice notice-amber" role="status">
+    <strong>{{ message }}</strong>
+    <ul>{% for node, issue in batch.errors.items() %}<li>{{ node.name }} · {{ issue }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro data_table(rows, columns, empty='No se encontraron registros con estos filtros.', detail_endpoint=None) %}
+{% if rows %}
+<div class="table-responsive" tabindex="0" role="region" aria-label="Resultados de la consulta">
+    <table class="table data-table">
+        <thead><tr>
+            {% for key, label in columns %}<th scope="col">{{ label }}</th>{% endfor %}
+            {% if detail_endpoint %}<th scope="col">Detalle</th>{% endif %}
+        </tr></thead>
+        <tbody>
+            {% for row in rows %}
+            <tr>
+                {% for key, label in columns %}
+                <td{% if key in ('pares', 'precio', 'total', 'subtotal', 'ingresos', 'ventas', 'precio_unitario') %} class="numeric"{% endif %}>
+                    {% if key == 'estado' and row[key] %}
+                        <span class="state-chip{% if row[key] == 'RECIBIDA' %} state-success{% endif %}">{{ row[key]|cell(key) }}</span>
+                    {% elif key == 'producto' and not row[key] and row.get('id_producto') %}
+                        Producto #{{ row.id_producto }}
+                    {% else %}{{ row[key]|cell(key) }}{% endif %}
+                </td>
+                {% endfor %}
+                {% if detail_endpoint %}
+                {% set record_id = row.id_venta if detail_endpoint == 'sale_detail' else row.id_transferencia %}
+                <td><a class="detail-link" href="{{ url_for(detail_endpoint, key=row.nodo_key, record_id=record_id) }}" aria-label="Ver detalle de {{ record_id }} en {{ row.nodo_nombre }}">Ver detalle</a></td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}<p class="empty-state">{{ empty }}</p>{% endif %}
+{% endmacro %}
+
+{% macro record_page(page, batch, columns, detail_endpoint=None) %}
+{% if page.number > page.last and batch.values %}
+<p class="empty-state">La página solicitada está fuera del rango. <a href="{{ page_url(page.last) }}">Ver última página disponible</a>.</p>
+{% else %}
+{{ data_table(page.rows, columns,
+    'No hay datos disponibles para esta consulta.' if batch.errors else 'No se encontraron registros con estos filtros.',
+    detail_endpoint) }}
+{% endif %}
+{% if batch.values %}
+<div class="table-footer">
+    <span>{{ page.known_total|digits }} {{ 'registros en los nodos consultados' if batch.errors else 'registros' }}</span>
+    {% if page.last > 1 and page.number <= page.last %}
+    <nav aria-label="Paginación de resultados" class="page-controls">
+        {% if page.number > 1 %}<a class="btn btn-outline-secondary btn-sm" href="{{ page_url(page.number - 1) }}">Anterior</a>{% endif %}
+        <span>Página {{ page.number }} de {{ page.last }}</span>
+        {% if page.number < page.last %}<a class="btn btn-outline-secondary btn-sm" href="{{ page_url(page.number + 1) }}">Siguiente</a>{% endif %}
+    </nav>
+    {% endif %}
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro chart(canvas_id, name, labels, values, unit='number', horizontal=False, accessible=True) %}
+<div class="chart-box">
+    <canvas id="{{ canvas_id }}" aria-label="{{ name }}" role="img"></canvas>
+    <script type="application/json" class="chart-config" data-target="{{ canvas_id }}">{{ {'labels': labels, 'values': values, 'unit': unit, 'horizontal': horizontal}|tojson }}</script>
+</div>
+{% if accessible %}
+<details class="chart-values">
+    <summary>Ver valores</summary>
+    <dl>
+        {% for label in labels %}
+        {% set value = values[loop.index0] %}
+        <div><dt>{{ label }}</dt><dd>{{ 'Sin datos' if value is none else (value|cell('ingresos') if unit == 'money' else value|digits) }}</dd></div>
+        {% endfor %}
+    </dl>
+</details>
+{% endif %}
+{% endmacro %}

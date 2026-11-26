@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading %}
+{% block content %}
+{{ heading(title, message) }}
+<a class="btn btn-primary" href="{{ url_for('dashboard') }}">Volver al panel</a>
+{% endblock %}

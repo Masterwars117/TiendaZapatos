@@ -1,0 +1,14 @@
+**
+!demo/
+!demo/Dockerfile
+!demo/bootstrap.py
+!demo/prepare_credentials.py
+!web/
+!web/*.py
+!web/requirements.txt
+!web/templates/
+!web/templates/**
+!web/static/
+!web/static/**
+!web/tests/
+!web/tests/*.py

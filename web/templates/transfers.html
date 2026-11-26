@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading, branches, issues, record_page with context %}
+{% block content %}
+{{ heading(title, 'Consulta los movimientos de mercancía registrados en la sucursal de origen.') }}
+<section class="surface">
+    <form class="filter-bar" method="get">
+        <div>{{ branches(nodes, request.args.get('sucursal', ''), 'Todos los orígenes') }}</div>
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Filtrar</button><a class="btn btn-clear" href="{{ url_for('transfers') }}">Limpiar</a></div>
+    </form>
+    {{ issues(batch) }}
+    {{ record_page(page, batch, columns, 'transfer_detail') }}
+</section>
+{% endblock %}

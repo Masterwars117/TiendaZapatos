@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading, data_table with context %}
+{% block content %}
+<a class="back-link" href="{{ url_for('sales' if kind == 'venta' else 'transfers', sucursal=node.key) }}">Volver al historial de {{ node.name }}</a>
+{{ heading(title, node.name) }}
+<section class="surface panel">
+    <dl class="detail-grid">
+        <div><dt>Fecha</dt><dd>{{ row.fecha|cell('fecha') }}</dd></div>
+        {% if kind == 'venta' %}
+        <div><dt>Importe total</dt><dd>{{ row.total|cell('total') }}</dd></div>
+        <div><dt>Empleado</dt><dd>{{ row.empleado|cell('empleado') }}</dd></div>
+        <div><dt>Cliente</dt><dd>{{ row.cliente|cell('cliente') }}</dd></div>
+        {% else %}
+        <div><dt>Origen</dt><dd>{{ row.origen }}</dd></div>
+        <div><dt>Destino</dt><dd>{{ row.destino }}</dd></div>
+        <div><dt>Estado</dt><dd>{{ row.estado|cell('estado') }}</dd></div>
+        {% endif %}
+    </dl>
+</section>
+<section class="surface panel section-gap">
+    <div class="panel-head"><h2>Productos</h2></div>
+    {{ data_table(details, columns, 'Este registro no tiene productos asociados.') }}
+</section>
+{% endblock %}

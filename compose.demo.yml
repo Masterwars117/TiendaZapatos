@@ -1,0 +1,117 @@
+name: tiendazapatos-demo
+
+x-mariadb: &mariadb
+  image: mariadb:11.4
+  restart: unless-stopped
+  environment:
+    MARIADB_DATABASE: zapateria_distribuida
+    MARIADB_ROOT_HOST: "%"
+    MARIADB_ROOT_PASSWORD_FILE: /run/zapateria-admin/root
+  depends_on:
+    credentials:
+      condition: service_completed_successfully
+  healthcheck:
+    test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+    interval: 3s
+    timeout: 3s
+    start_period: 20s
+    retries: 30
+
+x-python: &python
+  image: "${COMPOSE_PROJECT_NAME:-tiendazapatos-demo}-web:local"
+  build:
+    context: .
+    dockerfile: demo/Dockerfile
+
+services:
+  credentials:
+    <<: *python
+    command: ["python", "prepare_credentials.py"]
+    volumes:
+      - demo_admin:/run/zapateria-admin
+      - demo_reader:/run/zapateria-reader
+
+  villahermosa:
+    <<: *mariadb
+    command:
+      - --server-id=1
+      - --port=3307
+      - --log-bin=mariadb-bin
+      - --binlog-format=ROW
+      - --plugin-load-add=ha_federatedx
+    volumes:
+      - demo_villahermosa:/var/lib/mysql
+      - ./demo/init.sql:/docker-entrypoint-initdb.d/10-demo.sql:ro
+      - demo_admin:/run/zapateria-admin:ro
+
+  cardenas:
+    <<: *mariadb
+    command:
+      - --server-id=2
+      - --port=3308
+      - --relay-log=relay-bin
+      - --replicate-wild-do-table=zapateria_distribuida.sucursal
+      - --replicate-wild-do-table=zapateria_distribuida.proveedor
+      - --replicate-wild-do-table=zapateria_distribuida.producto
+      - --replicate-wild-do-table=zapateria_distribuida.talla
+    volumes:
+      - demo_cardenas:/var/lib/mysql
+      - ./demo/init.sql:/docker-entrypoint-initdb.d/10-demo.sql:ro
+      - demo_admin:/run/zapateria-admin:ro
+
+  cunduacan:
+    <<: *mariadb
+    command:
+      - --server-id=3
+      - --port=3309
+      - --relay-log=relay-bin
+      - --replicate-wild-do-table=zapateria_distribuida.sucursal
+      - --replicate-wild-do-table=zapateria_distribuida.proveedor
+      - --replicate-wild-do-table=zapateria_distribuida.producto
+      - --replicate-wild-do-table=zapateria_distribuida.talla
+    volumes:
+      - demo_cunduacan:/var/lib/mysql
+      - ./demo/init.sql:/docker-entrypoint-initdb.d/10-demo.sql:ro
+      - demo_admin:/run/zapateria-admin:ro
+
+  bootstrap:
+    <<: *python
+    command: ["python", "bootstrap_demo.py"]
+    volumes:
+      - demo_admin:/run/zapateria-admin:ro
+      - demo_reader:/run/zapateria-reader:ro
+    depends_on:
+      villahermosa:
+        condition: service_healthy
+      cardenas:
+        condition: service_healthy
+      cunduacan:
+        condition: service_healthy
+
+  web:
+    <<: *python
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DEMO_WEB_PORT:-8080}:5000"
+    volumes:
+      - demo_reader:/run/zapateria-reader:ro
+    environment:
+      DB_VILLAHERMOSA_HOST: villahermosa
+      DB_VILLAHERMOSA_USER: zapateria_lectura
+      DB_VILLAHERMOSA_PASSWORD_FILE: /run/zapateria-reader/password
+      DB_CARDENAS_HOST: cardenas
+      DB_CARDENAS_USER: zapateria_lectura
+      DB_CARDENAS_PASSWORD_FILE: /run/zapateria-reader/password
+      DB_CUNDUACAN_HOST: cunduacan
+      DB_CUNDUACAN_USER: zapateria_lectura
+      DB_CUNDUACAN_PASSWORD_FILE: /run/zapateria-reader/password
+    depends_on:
+      bootstrap:
+        condition: service_completed_successfully
+
+volumes:
+  demo_admin:
+  demo_reader:
+  demo_villahermosa:
+  demo_cardenas:
+  demo_cunduacan:

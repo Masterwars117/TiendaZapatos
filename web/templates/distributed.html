@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading, branches, data_table, issues with context %}
+{% block content %}
+{{ heading(title, 'Ejecuta consultas predefinidas y examina el SQL, los resultados y el plan de MariaDB.') }}
+<section class="surface">
+    <form class="filter-bar" method="get">
+        <div class="filter-search">
+            <label class="form-label" for="consulta">Consulta</label>
+            <select class="form-select" id="consulta" name="consulta" required>
+                <option value="">Selecciona una consulta</option>
+                {% for key, demo in demos.items() %}<option value="{{ key }}"{% if key == selection %} selected{% endif %}>{{ demo.title }}</option>{% endfor %}
+            </select>
+        </div>
+        <div>{{ branches(nodes, request.args.get('sucursal', ''), none) }}</div>
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Ejecutar consulta</button></div>
+    </form>
+</section>
+{% if result %}
+<section class="surface panel section-gap">
+    <div class="panel-head"><h2>{{ demos[selection].title }}</h2></div>
+    <p>{{ demos[selection].description }} {{ demos[selection].approach }}</p>
+    <dl class="detail-grid">
+        <div><dt>Nodos involucrados</dt><dd>{{ result.targets|map(attribute='name')|join(', ') }}</dd></div>
+        <div><dt>Tiempo total observado</dt><dd>{{ '%.2f'|format(result.elapsed) }} ms</dd></div>
+    </dl>
+    <p class="small text-body-secondary mt-3 mb-0">El tiempo total incluye conexiones, comprobaciones y planes de ejecución.</p>
+</section>
+{{ issues(result.dependencies, 'No se pudo verificar la cobertura de la vista global.') }}
+{{ issues(result.batch, 'Una o más ejecuciones fallaron.') }}
+{% if result.inconsistent %}
+<div class="notice notice-amber" role="status"><strong>El resumen de la vista difiere de los fragmentos.</strong>
+    <p>Vuelve a ejecutar la consulta para verificar si hubo cambios concurrentes.</p></div>
+{% endif %}
+{% for node, execution in result.batch.values.items() %}
+<section class="surface panel section-gap">
+    <div class="panel-head"><h2>{{ node.name }}</h2><span class="source-chip">{{ '%.2f'|format(execution.elapsed) }} ms de consulta</span></div>
+    <h3>SQL ejecutado</h3>
+    <pre class="sql-code"><code>{{ execution.sql }}</code></pre>
+    {% if not result.inconsistent %}
+    <h3 class="mt-4">Resultados{% if result.batch.errors %} de este nodo{% endif %}</h3>
+    {% if selection == 'ventas' %}
+    {{ data_table(execution.rows, [('ventas', 'Ventas'), ('ingresos', 'Ingresos')]) }}
+    {% else %}
+    {{ data_table(execution.rows, [('id_sucursal', 'ID sucursal'), ('referencias', 'Referencias'), ('pares', 'Pares')]) }}
+    {% endif %}
+    {% endif %}
+    <details class="execution-plan" open>
+        <summary>Plan de ejecución (EXPLAIN)</summary>
+        {% if execution.plan %}
+        {% set plan_columns = execution.plan[0].keys()|list %}
+        <div class="table-responsive" tabindex="0" role="region" aria-label="Plan de ejecución">
+            <table class="table data-table"><thead><tr>{% for key in plan_columns %}<th scope="col">{{ key }}</th>{% endfor %}</tr></thead>
+            <tbody>{% for row in execution.plan %}<tr>{% for key in plan_columns %}<td>{{ row[key]|cell(key) }}</td>{% endfor %}</tr>{% endfor %}</tbody></table>
+        </div>
+        {% else %}<p>{{ 'MariaDB no devolvió el plan. Revisa los permisos de lectura y la vista.' if execution.plan_error else 'La consulta no devolvió filas de plan.' }}</p>{% endif %}
+    </details>
+</section>
+{% endfor %}
+{% endif %}
+<section class="surface panel section-gap">
+    <div class="panel-head"><h2>Consulta local y consulta distribuida</h2></div>
+    <dl class="comparison-notes">
+        <div><dt>Local</dt><dd>MariaDB lee el fragmento de una sucursal. Por ejemplo, el inventario de Cárdenas se consulta en su propio nodo.</dd></div>
+        <div><dt>Distribuida</dt><dd>El resultado reúne varias sucursales. Flask puede combinar las lecturas directas, o Villahermosa puede reunirlas mediante la vista <code>inventario_global</code>.</dd></div>
+    </dl>
+</section>
+{% endblock %}

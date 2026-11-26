@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% from 'components.html' import chart with context %}
+{% block scripts %}<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>{% endblock %}
+{% block content %}
+<header class="page-heading dashboard-hero">
+    <div>
+        <h1>{{ title }}</h1>
+        <p>Resumen de inventario, ventas y transferencias por sucursal.</p>
+    </div>
+    <a class="btn refresh-button" href="{{ url_for('dashboard') }}">Actualizar panel</a>
+</header>
+
+{% if setup_nodes %}
+<section class="dashboard-setup" aria-labelledby="setup-title">
+    <span class="setup-icon" aria-hidden="true">!</span>
+    <div>
+        <h2 id="setup-title">Completa la conexión a MariaDB</h2>
+        <p>Faltan las credenciales de consulta de {{ setup_nodes|map(attribute='name')|join(', ') }}.</p>
+        <details class="setup-steps">
+            <summary>Ver pasos de configuración</summary>
+            <ol>
+                {% if nodes[0] in setup_nodes %}
+                <li>Crea la cuenta de solo lectura de Villahermosa siguiendo la sección <strong>Usuarios de solo lectura</strong> de <code>web/README.md</code>.</li>
+                {% endif %}
+                <li>Completa el usuario y la contraseña de cada nodo pendiente en <code>web/.env</code>.</li>
+                <li>Guarda el archivo y pulsa <strong>Actualizar panel</strong>.</li>
+            </ol>
+        </details>
+    </div>
+</section>
+{% endif %}
+
+{% set metrics = [
+    ('sucursales', 'Sucursales', 'catalogs', {'name':'sucursales'}, 'catalogs', 'sky'),
+    ('productos', 'Productos', 'catalogs', {'name':'productos'}, 'inventory', 'sky'),
+    ('pares', 'Pares disponibles', 'inventory', {}, 'inventory', 'green'),
+    ('ventas', 'Ventas registradas', 'sales', {}, 'sales', 'violet'),
+    ('ingresos', 'Ingresos registrados', 'sales', {}, 'statistics', 'violet'),
+    ('transferencias', 'Transferencias', 'transfers', {}, 'transfers', 'green')
+] %}
+<section class="dashboard-metrics" aria-labelledby="metrics-title">
+    <div class="dashboard-section-head">
+        <h2 id="metrics-title">Indicadores generales</h2>
+        {% if totals|length < metrics|length %}<span class="metric-coverage">Sin datos completos</span>{% endif %}
+    </div>
+    <div class="metric-grid">
+        {% for key, label, endpoint, args, icon, tone in metrics %}
+        {% set value = totals.get(key) %}
+        <a class="metric-card" data-tone="{{ tone }}" href="{{ url_for(endpoint, **args) }}">
+            <span class="metric-icon"><span class="nav-icon icon-{{ icon }}" aria-hidden="true"></span></span>
+            <span class="metric-label">{{ label }}</span>
+            <strong class="metric-number{% if value is none %} missing-value{% endif %}">
+                {{ value|cell('ingresos') if key == 'ingresos' else value|digits }}
+                {% if value is none %}<span class="visually-hidden">Sin datos</span>{% endif %}
+            </strong>
+            {% if value is not none and key in ('sucursales', 'productos') and catalog_node.id != 1 %}
+            <small>Réplica de {{ catalog_node.name }}</small>{% endif %}
+        </a>
+        {% endfor %}
+    </div>
+</section>
+
+<div class="dashboard-grid">
+    <section class="surface panel dashboard-stock">
+        <div class="panel-head"><h2>Pares por sucursal</h2><a href="{{ url_for('inventory') }}">Ver inventario</a></div>
+        {% if operations.values %}
+            {% set stock = namespace(values=[]) %}
+            {% for node in nodes %}
+                {% set stock.values = stock.values + [operations.values[node].pares if node in operations.values else none] %}
+            {% endfor %}
+            {% if not operations.complete %}<p class="chart-scope">Existencias de los nodos disponibles.</p>{% endif %}
+            {{ chart('dashboard-stock', 'Pares por sucursal', nodes|map(attribute='name')|list, stock.values) }}
+        {% else %}
+            <div class="stock-empty">
+                <span class="stock-empty-icon" aria-hidden="true"><span class="nav-icon icon-inventory"></span></span>
+                <strong>Existencias no disponibles</strong>
+                <p>Conecta una sucursal para consultar su inventario.</p>
+            </div>
+        {% endif %}
+    </section>
+
+    <section class="surface panel dashboard-nodes" id="nodos">
+        <div class="panel-head"><h2>Estado de los nodos</h2></div>
+        <p class="connection-count">{{ status.values|length }} de {{ nodes|length }} disponibles para consulta</p>
+        <div class="connection-meter" aria-hidden="true">
+            {% for node in nodes %}
+            <span class="{{ 'online' if node in status.values else 'pending' if node in setup_nodes else 'offline' }}"></span>
+            {% endfor %}
+        </div>
+        <ul class="node-list">
+            {% for node in nodes %}
+            {% if node in setup_nodes %}
+                {% set state, label = 'pending', 'Por configurar' %}
+            {% elif node not in status.values %}
+                {% set state, label = 'offline', 'Sin conexión' %}
+            {% elif node_issues[node] %}
+                {% set state, label = 'pending', 'Consulta limitada' %}
+            {% else %}
+                {% set state, label = 'online', 'Disponible' %}
+            {% endif %}
+            <li>
+                <div>
+                    <strong>{{ node.name }}</strong>
+                    <small>Puerto {{ node.port }}</small>
+                    {% for issue in node_issues[node] %}<small class="node-detail">{{ issue }}</small>{% endfor %}
+                </div>
+                <span class="node-state {{ state }}">{{ label }}</span>
+            </li>
+            {% endfor %}
+        </ul>
+    </section>
+</div>
+{% endblock %}

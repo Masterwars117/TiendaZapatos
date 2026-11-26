@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading, chart, issues with context %}
+{% block scripts %}<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}" defer></script>{% endblock %}
+{% block content %}
+{{ heading(title, 'Compara ventas, ingresos y existencias de las tres sucursales.') }}
+{{ issues(batch, 'Gráficas parciales. Las sucursales sin conexión se muestran sin datos.') }}
+{% if batch.values %}
+{% set labels = nodes|map(attribute='name')|list %}
+{% set metrics = [
+    ('ventas', 'Ventas por sucursal', 'number'),
+    ('pares', 'Inventario por sucursal', 'number'),
+    ('ingresos', 'Ingresos por sucursal', 'money')
+] %}
+<div class="report-grid">
+    {% for key, label, unit in metrics %}
+    {% set data = namespace(values=[]) %}
+    {% for node in nodes %}
+    {% set value = batch.values[node][key] if node in batch.values else none %}
+    {% set data.values = data.values + [value|float if value is not none and unit == 'money' else value] %}
+    {% endfor %}
+    <section class="surface panel">
+        <div class="panel-head"><h2>{{ label }}</h2></div>
+        {{ chart('chart-' ~ key, label, labels, data.values, unit) }}
+    </section>
+    {% endfor %}
+    <section class="surface panel">
+        <div class="panel-head"><h2>Productos más vendidos</h2></div>
+        {% if ranking %}
+            {% set rank_data = namespace(labels=[], values=[]) %}
+            {% for product in ranking %}
+                {% set rank_data.labels = rank_data.labels + [product_label(product)] %}
+                {% set rank_data.values = rank_data.values + [product.pares] %}
+            {% endfor %}
+            {{ chart('chart-ranking', 'Productos más vendidos por pares', rank_data.labels, rank_data.values, horizontal=true) }}
+        {% else %}<p class="empty-state">{{ 'El ranking requiere datos de los tres nodos.' if batch.errors else 'No hay productos vendidos.' }}</p>{% endif %}
+    </section>
+</div>
+<section class="surface panel section-gap">
+    <div class="panel-head"><h2>Comparación de existencias por producto</h2></div>
+    {% if products %}
+    <div class="product-picker">
+        <label class="form-label" for="product-picker">Producto</label>
+        <select class="form-select" id="product-picker">
+            {% for product in products %}<option value="{{ product.id }}">{{ product.label }}</option>{% endfor %}
+        </select>
+    </div>
+    {{ chart('chart-comparison', 'Pares por sucursal del producto seleccionado', labels, products[0]['values'], accessible=false) }}
+    <script type="application/json" id="stock-data">{{ products|tojson }}</script>
+    <dl class="summary-values comparison-values" aria-live="polite">
+        {% for node in nodes %}
+        {% set value = products[0]['values'][loop.index0] %}
+        <div><dt>{{ node.name }}</dt><dd data-stock-value>{{ 'Sin datos' if value is none else value|digits }}</dd></div>
+        {% endfor %}
+    </dl>
+    {% else %}<p class="empty-state">No hay existencias registradas para comparar.</p>{% endif %}
+</section>
+{% else %}
+<section class="surface panel"><p class="empty-state">Conecta al menos una sucursal para consultar sus estadísticas.</p></section>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading, branches, issues, record_page with context %}
+{% block content %}
+{{ heading(title, 'Consulta las existencias de cada producto y talla por sucursal.') }}
+<section class="surface">
+    <form class="filter-bar" method="get">
+        <div class="filter-search">
+            <label class="form-label" for="q">Nombre, modelo, marca o talla</label>
+            <input class="form-control" id="q" name="q" type="search" maxlength="100" value="{{ request.args.get('q', '') }}">
+        </div>
+        <div>{{ branches(nodes, request.args.get('sucursal', '')) }}</div>
+        <div class="filter-narrow">
+            <label class="form-label" for="talla">Talla exacta</label>
+            <input class="form-control" id="talla" name="talla" inputmode="decimal" placeholder="26.5" value="{{ request.args.get('talla', '') }}">
+        </div>
+        <div class="filter-narrow">
+            <label class="form-label" for="minimo">Pares mínimos</label>
+            <input class="form-control" id="minimo" name="minimo" type="number" min="0" max="2147483647" value="{{ request.args.get('minimo', '') }}">
+        </div>
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Filtrar</button><a class="btn btn-clear" href="{{ url_for('inventory') }}">Limpiar</a></div>
+    </form>
+    {{ issues(batch) }}
+    {{ record_page(page, batch, columns) }}
+</section>
+{% endblock %}

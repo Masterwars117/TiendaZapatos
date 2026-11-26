@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading, branches, issues, record_page with context %}
+{% block content %}
+{{ heading(title, 'Consulta los registros disponibles de la red de sucursales.') }}
+<nav class="catalog-tabs" aria-label="Catálogos">
+    {% for key, definition in catalogs.items() %}
+    <a href="{{ url_for('catalogs', name=key) }}"{% if name == key %} aria-current="page"{% endif %}>{{ definition[0] }}</a>
+    {% endfor %}
+</nav>
+<section class="surface">
+    <div class="panel-head catalog-head">
+        <h2>{{ label }}</h2>
+        {% if name != 'empleados' and batch.values %}
+            {% set source = batch.values|first %}
+            <span class="source-chip">{{ 'Copia consultada' if source.id == 1 else 'Réplica consultada' }} · {{ source.name }}</span>
+        {% endif %}
+    </div>
+    <form class="filter-bar" method="get">
+        <div class="filter-search">
+            <label class="form-label" for="q">Buscar en {{ label|lower }}</label>
+            <input class="form-control" id="q" name="q" type="search" maxlength="100" value="{{ request.args.get('q', '') }}">
+        </div>
+        {% if name == 'empleados' %}<div>{{ branches(nodes, request.args.get('sucursal', '')) }}</div>{% endif %}
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Filtrar</button><a class="btn btn-clear" href="{{ url_for('catalogs', name=name) }}">Limpiar</a></div>
+    </form>
+    {{ issues(batch, 'Consulta parcial de empleados.' if batch.values else 'Catálogo no disponible.') }}
+    {{ record_page(page, batch, columns) }}
+</section>
+{% endblock %}

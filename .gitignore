@@ -1,0 +1,18 @@
+# Credenciales y configuración local
+.env
+.env.*
+!.env.example
+
+# Instalación original de esta PC
+/docker-compose.yml
+/zapateria_distribuida.sql
+
+# Archivos generados y editores
+.venv/
+__pycache__/
+*.py[cod]
+.coverage
+.pytest_cache/
+.vscode/
+.idea/
+.DS_Store

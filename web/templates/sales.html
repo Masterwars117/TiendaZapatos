@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% from 'components.html' import heading, branches, issues, record_page, data_table with context %}
+{% block content %}
+{{ heading(title, 'Consulta el historial, los importes y los productos vendidos por sucursal.') }}
+<section class="surface">
+    <form class="filter-bar" method="get">
+        <div>{{ branches(nodes, request.args.get('sucursal', '')) }}</div>
+        <div><label class="form-label" for="desde">Desde</label>
+            <input class="form-control" id="desde" name="desde" type="date" value="{{ request.args.get('desde', '') }}"></div>
+        <div><label class="form-label" for="hasta">Hasta</label>
+            <input class="form-control" id="hasta" name="hasta" type="date" value="{{ request.args.get('hasta', '') }}"></div>
+        <div class="filter-actions"><button class="btn btn-primary" type="submit">Filtrar</button><a class="btn btn-clear" href="{{ url_for('sales') }}">Limpiar</a></div>
+    </form>
+    {{ issues(batch) }}
+    {{ record_page(page, batch, columns, 'sale_detail') }}
+</section>
+{{ issues(summary, 'Ingresos disponibles por nodo. El ranking general requiere todos los fragmentos seleccionados.') }}
+<div class="report-grid">
+    <section class="surface panel">
+        <div class="panel-head"><h2>Ingresos por sucursal</h2></div>
+        <dl class="summary-values">
+            {% for node in selected %}
+            <div><dt>{{ node.name }}</dt><dd>{{ summary.values[node].ingresos|cell('ingresos') if node in summary.values else 'Sin datos' }}</dd></div>
+            {% endfor %}
+        </dl>
+    </section>
+    <section class="surface panel">
+        <div class="panel-head"><h2>Productos más vendidos</h2></div>
+        {{ data_table(ranking, [('producto', 'Producto'), ('modelo', 'Modelo'), ('pares', 'Pares')],
+            'Ranking no disponible para el alcance seleccionado.' if summary.errors else 'No hay productos vendidos en este periodo.') }}
+    </section>
+</div>
+{% endblock %}
